@@ -1,0 +1,138 @@
+{
+  "name": "ClickUp: Archive Relational Tasks",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "archive_relational_tasks",
+        "options": {}
+      },
+      "id": "17ff388e-248b-4d4b-9e74-ff9f18ac62b0",
+      "name": "Receive ClickUp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "46b35a8e-b0e0-4bd1-a835-b407b123ea4b"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "id": "={{ $json[\"body\"][\"payload\"][\"id\"] }}"
+      },
+      "id": "3f822c38-cecc-4718-b898-cd595ba9d48b",
+      "name": "Get Task by ID from ClickUp",
+      "type": "n8n-nodes-base.clickUp",
+      "typeVersion": 1,
+      "position": [
+        256,
+        0
+      ],
+      "credentials": {
+        "clickUpApi": {
+          "id": "wk2qRHSqYQUXiHvP",
+          "name": "Simon Clickup API Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map list ID → which custom field holds the related Call task IDs.\n// List 901109645307 → field \"Calls\"\n// List 901109645497 → field \"📞 Calls\"\nconst task = $input.item.json;\nconst listId = task.list?.id;\n\nconst fieldNameMap = {\n  \"901109645307\": \"Calls\",\n  \"901109645497\": \"📞 Calls\"\n};\n\nconst targetFieldName = fieldNameMap[listId];\nif (!targetFieldName) {\n  // No matching list — nothing to archive\n  return [];\n}\n\nconst customFields = task.custom_fields ?? [];\nconst field = customFields.find(f => f.name === targetFieldName);\nconst relatedTasks = field?.value ?? [];\n\n// relatedTasks is an array of related task objects; extract their IDs\nconst taskIds = relatedTasks.map(t => ({ taskId: t.id }));\n\nreturn taskIds.map(item => ({ json: item }));\n"
+      },
+      "id": "b8c22cfb-1e98-4c3f-84db-5bd4db342f46",
+      "name": "Resolve Related Task IDs by List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.clickup.com/api/v2/task/{{ $json[\"taskId\"] }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "clickUpApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"archived\": true }",
+        "options": {}
+      },
+      "id": "55374b96-3115-4eab-9586-3c49e3a4dfd9",
+      "name": "Archive Each Related Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        752,
+        0
+      ],
+      "credentials": {
+        "clickUpApi": {
+          "id": "wk2qRHSqYQUXiHvP",
+          "name": "Simon Clickup API Token"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive ClickUp Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Task by ID from ClickUp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Task by ID from ClickUp": {
+      "main": [
+        [
+          {
+            "node": "Resolve Related Task IDs by List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Related Task IDs by List": {
+      "main": [
+        [
+          {
+            "node": "Archive Each Related Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8d93cd61-e07b-4435-8153-2aea06f18ca1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e01ca6cd6074f1228e64a8f35f2df661debd20bd1c4ebb50e3223455c9da0e24"
+  },
+  "id": "D9hw5XzhOoFoG6gz",
+  "tags": []
+}
